@@ -1,1 +1,28 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><title>PhpWails</title><style>body{font:16px system-ui;margin:32px}button{padding:8px 14px}output,pre{display:block;margin-top:16px;white-space:pre-wrap}pre{background:#f4f4f4;padding:12px;border-radius:6px}</style></head><body><main><h1>PhpWails</h1><button id="greet">Call PHP</button><output id="result"></output><pre id="debug"></pre></main><script src="./bridge.js"></script><script src="./phpwails/index.js"></script><script src="./main.js"></script></body></html>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhpWails 控制台</title>
+  <style>
+    :root{color-scheme:light;--nav:#172033;--primary:#4f46e5;--primary-dark:#4338ca;--bg:#f3f5f9;--text:#172033;--muted:#667085;--line:#e7eaf0;--success:#16845b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    .topbar{height:64px;background:var(--nav);color:#fff;display:flex;align-items:center;padding:0 32px;gap:42px}.brand{display:flex;align-items:center;gap:11px;font-weight:700;font-size:18px;letter-spacing:-.02em}.brand-mark{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--primary);font-size:16px}.nav{display:flex;gap:8px;color:#aeb7ca}.nav span{padding:8px 12px;border-radius:6px;cursor:pointer;transition:.15s}.nav span:hover{color:#fff;background:#ffffff12}.nav span.active{color:#fff;background:#ffffff18}.nav span:first-child{color:#fff}.profile{margin-left:auto;color:#cbd3e1;font-size:13px}
+    .shell{max-width:1180px;margin:0 auto;padding:34px 28px 52px}.heading{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:26px}.eyebrow{margin:0 0 6px;color:var(--primary);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.heading h1{margin:0;font-size:28px;letter-spacing:-.03em}.heading p{margin:7px 0 0;color:var(--muted)}.status{display:flex;align-items:center;gap:8px;color:var(--success);font-size:13px}.dot{width:8px;height:8px;border-radius:50%;background:#24b47e;box-shadow:0 0 0 4px #d9f5e9}
+    .card{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 2px 5px #17203308}.metrics{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:22px}.metric{padding:20px 22px;border-right:1px solid var(--line)}.metric:last-child{border-right:0}.metric-label{color:var(--muted);font-size:13px}.metric-value{margin-top:4px;font-size:25px;font-weight:700}.metric-note{color:var(--success);font-size:12px;margin-top:3px}
+    .section-head{display:flex;justify-content:space-between;align-items:center;padding:19px 22px;border-bottom:1px solid var(--line)}.section-title{font-size:16px;font-weight:700}.section-subtitle{margin:3px 0 0;color:var(--muted);font-size:13px}.action{border:0;border-radius:7px;padding:9px 15px;background:var(--primary);color:#fff;font-weight:600;cursor:pointer;transition:.15s}.action:hover{background:var(--primary-dark)}.action:active{transform:translateY(1px)}
+    table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:14px 22px;border-bottom:1px solid var(--line)}th{color:var(--muted);font-size:12px;font-weight:600;background:#fafbfc}tr:last-child td{border-bottom:0}.method{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--primary);font-size:13px}.badge{display:inline-flex;padding:3px 9px;border-radius:20px;background:#e8f7f0;color:var(--success);font-size:12px;font-weight:600}.result{min-height:44px;padding:16px 22px;color:var(--muted);border-top:1px solid var(--line)}.result strong{color:var(--text)}#debug{display:none}
+    @media(max-width:700px){.topbar{padding:0 18px}.nav{display:none}.shell{padding:24px 16px}.heading{display:block}.status{margin-top:16px}.metrics{grid-template-columns:1fr}.metric{border-right:0;border-bottom:1px solid var(--line)}.metric:last-child{border-bottom:0}th,td{padding:12px 14px}.hide-mobile{display:none}}
+  </style>
+</head>
+<body>
+  <header class="topbar"><div class="brand"><span class="brand-mark">P</span><span>PhpWails</span></div><nav class="nav"><span>概览</span><span>接口</span><span>设置</span></nav><div class="profile">开发环境</div></header>
+  <main class="shell">
+    <div class="heading"><div><p class="eyebrow">Application overview</p><h1>应用概览</h1><p>查看应用状态与已注册的 PHP 导出方法。</p></div><div class="status"><i class="dot"></i><span>运行正常</span></div></div>
+    <section class="card metrics"><div class="metric"><div class="metric-label">应用状态</div><div class="metric-value">Online</div><div class="metric-note">Native WebView 已连接</div></div><div class="metric"><div class="metric-label">已注册方法</div><div class="metric-value">1</div><div class="metric-note">PHP Export API</div></div><div class="metric"><div class="metric-label">运行环境</div><div class="metric-value">PHP 8.2+</div><div class="metric-note">PhpWails Runtime</div></div></section>
+    <section class="card"><div class="section-head"><div><div class="section-title">PHP 导出方法</div><p class="section-subtitle">通过安全桥接调用后端业务逻辑</p></div><button class="action" id="greet">调用方法</button></div><table><thead><tr><th>方法名称</th><th>类型</th><th class="hide-mobile">说明</th><th>状态</th></tr></thead><tbody><tr><td class="method">App.greet</td><td>Function</td><td class="hide-mobile">返回问候语</td><td><span class="badge">可用</span></td></tr></tbody></table><div class="result" id="result">准备就绪，点击“调用方法”测试 PHP Runtime。</div></section>
+    <pre id="debug"></pre>
+  </main>
+  <script src="./bridge.js"></script><script src="./phpwails/index.js"></script><script src="./main.js"></script>
+</body>
+</html>

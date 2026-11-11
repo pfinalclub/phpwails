@@ -82,6 +82,10 @@ svelte
 
 当前 Vanilla 模板是完整度最高的示例。
 
+### 运行截图
+
+![PhpWails 运行截图](https://raw.githubusercontent.com/pfinal-nc/iGallery/master/blog/20261111183245826.png)
+
 ### 2. 进入项目并生成绑定
 
 ```bash
