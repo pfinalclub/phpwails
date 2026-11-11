@@ -1,0 +1,108 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+$root = dirname(__DIR__, 3);
+$autoload = $root . '/vendor/autoload.php';
+if (is_file($autoload)) require $autoload;
+
+$args = $_SERVER['argv'];
+$command = $args[1] ?? 'help';
+$has = static fn(string $option): bool => in_array($option, $args, true);
+$value = static function (string $option, ?string $default = null) use ($args): ?string {
+    foreach ($args as $arg) if (str_starts_with($arg, $option . '=')) return substr($arg, strlen($option) + 1);
+    return $default;
+};
+$jsonOutput = $has('--format=json');
+
+$emit = static function (string $name, array $data, int $exit = 0) use ($jsonOutput): never {
+    if ($jsonOutput) fwrite(STDOUT, json_encode(['command'=>$name,'status'=>$exit === 0 ? 'success' : 'failed','data'=>$data,'diagnostics'=>[],'durationMs'=>0], JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    else foreach ($data as $key => $item) fwrite(STDOUT, is_array($item) ? sprintf("%-24s %s\n", $key, json_encode($item, JSON_UNESCAPED_SLASHES)) : sprintf("%-24s %s\n", $key, (string) $item));
+    exit($exit);
+};
+
+if ($command === '--version') { fwrite(STDOUT, "PhpWails 0.1.0-alpha\n"); exit(0); }
+if ($command === 'help') { fwrite(STDOUT, "PhpWails commands: doctor, init, dev, bindings, build\nOptions: --format=text|json\n"); exit(0); }
+
+if ($command === 'doctor') {
+    $checks = [];
+    $checks[] = ['checkId'=>'php.version','status'=>version_compare(PHP_VERSION,'8.2.0','>=')?'pass':'fail','detectedValue'=>PHP_VERSION,'requiredValue'=>'>=8.2.0'];
+    $checks[] = ['checkId'=>'php.json','status'=>extension_loaded('json')?'pass':'fail','detectedValue'=>extension_loaded('json')?'enabled':'missing','requiredValue'=>'enabled'];
+    $checks[] = ['checkId'=>'php.phar','status'=>extension_loaded('phar')?'pass':'fail','detectedValue'=>extension_loaded('phar')?'enabled':'missing','requiredValue'=>'enabled'];
+    $checks[] = ['checkId'=>'frontend.node','status'=>trim((string) shell_exec('command -v node 2>/dev/null')) !== ''?'pass':'warning','detectedValue'=>trim((string) shell_exec('node --version 2>/dev/null')) ?: 'not found','requiredValue'=>'Node.js LTS for frontend development'];
+    $checks[] = ['checkId'=>'frontend.npm','status'=>trim((string) shell_exec('command -v npm 2>/dev/null')) !== ''?'pass':'warning','detectedValue'=>trim((string) shell_exec('npm --version 2>/dev/null')) ?: 'not found','requiredValue'=>'npm for frontend development'];
+    $failed = array_filter($checks, static fn(array $check): bool => $check['status'] === 'fail');
+    if ($jsonOutput) $emit('doctor', $checks, $failed ? 3 : 0);
+    foreach ($checks as $check) fwrite(STDOUT, sprintf("%-24s %-7s %s\n", $check['checkId'], strtoupper($check['status']), $check['detectedValue']));
+    exit($failed ? 3 : 0);
+}
+
+if ($command === 'init') {
+    $directory = $args[2] ?? null;
+    if ($directory === null || str_starts_with($directory, '--')) { fwrite(STDERR, "Usage: phpwails init <directory> [--template=vanilla|vue|react|svelte]\n"); exit(2); }
+    $template = $value('--template', 'vanilla');
+    if (!in_array($template, ['vanilla','vue','react','svelte'], true)) { fwrite(STDERR, "Unsupported template: {$template}\n"); exit(2); }
+    $target = str_starts_with($directory, DIRECTORY_SEPARATOR) ? $directory : getcwd() . DIRECTORY_SEPARATOR . $directory;
+    if (is_dir($target) && count(array_diff(scandir($target) ?: [], ['.','..'])) > 0 && !$has('--force')) { fwrite(STDERR, "Target directory is not empty; use --force to continue.\n"); exit(2); }
+    if (!is_dir($target) && !mkdir($target, 0777, true)) { fwrite(STDERR, "Unable to create target directory.\n"); exit(3); }
+    $source = $root . '/templates/' . $template;
+    $copy = static function (string $from, string $to) use (&$copy): void {
+        if (is_dir($from)) { if (!is_dir($to)) mkdir($to, 0777, true); foreach (array_diff(scandir($from) ?: [], ['.','..']) as $item) $copy($from . '/' . $item, $to . '/' . $item); return; }
+        if (!copy($from, $to)) throw new RuntimeException("Unable to copy {$from}");
+    };
+    try { $copy($source, $target); } catch (Throwable $error) { fwrite(STDERR, $error->getMessage() . "\n"); exit(3); }
+    $emit('init', ['projectRoot'=>$target,'template'=>$template,'next'=>['phpwails doctor','phpwails dev']]);
+}
+
+if ($command === 'bindings') {
+    $project = isset($args[2]) && !str_starts_with($args[2], '--') ? $args[2] : getcwd();
+    $project = str_starts_with($project, DIRECTORY_SEPARATOR) ? $project : getcwd() . DIRECTORY_SEPARATOR . $project;
+    $project = realpath($project) ?: $project;
+    $entry = rtrim($project, DIRECTORY_SEPARATOR) . '/App.php';
+    if (!is_file($entry)) { fwrite(STDERR, "App.php not found in {$project}.\n"); exit(2); }
+    require_once $root . '/packages/runtime/src/Attribute/Export.php';
+    require_once $root . '/packages/codegen/src/BindingCompiler.php';
+    require_once $entry;
+    if (!class_exists('App')) { fwrite(STDERR, "App class not found in {$entry}.\n"); exit(2); }
+    $compiler = new \PhpWails\Codegen\BindingCompiler();
+    $manifest = $compiler->compile(new App(), 'App');
+    $output = rtrim($project, DIRECTORY_SEPARATOR) . '/frontend/phpwails';
+    if ($has('--check')) { $manifestPath = $output . '/manifest.json'; $current = is_file($manifestPath) ? json_decode((string) file_get_contents($manifestPath), true) : null; exit($current === $manifest ? 0 : 2); }
+    $compiler->write($manifest, $output);
+    $emit('bindings', ['outputDirectory'=>$output,'methodCount'=>count($manifest['methods']),'manifest'=>$manifest]);
+}
+
+if ($command === 'dev') {
+    $project = isset($args[2]) && !str_starts_with($args[2], '--') ? $args[2] : getcwd();
+    $project = str_starts_with($project, DIRECTORY_SEPARATOR) ? $project : getcwd() . DIRECTORY_SEPARATOR . $project;
+    $project = realpath($project) ?: $project;
+    $config = rtrim($project, DIRECTORY_SEPARATOR) . '/phpwails.json';
+    if (!is_file($config)) { fwrite(STDERR, "phpwails.json not found in {$project}. Run phpwails init <directory> first.\n"); exit(2); }
+    $parsed = json_decode((string) file_get_contents($config), true);
+    if (!is_array($parsed) || !isset($parsed['app'], $parsed['window'], $parsed['frontend'])) { fwrite(STDERR, "Invalid phpwails.json: app, window and frontend are required.\n"); exit(2); }
+    fwrite(STDOUT, "Development configuration validated for {$parsed['app']['name']}\n");
+    $appFile = rtrim($project, DIRECTORY_SEPARATOR) . '/App.php';
+    if (is_file($appFile)) {
+        require_once $root . '/packages/runtime/src/Attribute/Export.php';
+        require_once $root . '/packages/codegen/src/BindingCompiler.php';
+        require_once $appFile;
+        if (class_exists('App')) {
+            $compiler = new \PhpWails\Codegen\BindingCompiler();
+            $compiler->write($compiler->compile(new App(), 'App'), rtrim($project, DIRECTORY_SEPARATOR) . '/frontend/phpwails');
+            fwrite(STDOUT, "Bindings generated.\n");
+        }
+    }
+    $launcher = $root . '/build/native/phpwails-native';
+    $entry = rtrim($project, DIRECTORY_SEPARATOR) . '/' . ($parsed['frontend']['entryDocument'] ?? 'index.html');
+    if ($has('--no-window')) { fwrite(STDOUT, "Window launch skipped (--no-window).\n"); exit(0); }
+    if (!is_file($launcher)) { fwrite(STDERR, "Native launcher not found at {$launcher}. Build native/phpwails-native first.\n"); exit(3); }
+    if (!is_file($entry)) { fwrite(STDERR, "Frontend entry not found at {$entry}.\n"); exit(2); }
+    fwrite(STDOUT, "Starting native WebView launcher...\n");
+    putenv('PHPWAILS_ROOT=' . $root);
+    putenv('PHPWAILS_DEVTOOLS=1');
+    passthru(escapeshellarg($launcher) . ' ' . escapeshellarg($entry) . ' ' . escapeshellarg($project), $status);
+    exit($status);
+}
+
+fwrite(STDERR, "Unknown command: {$command}\n"); exit(2);

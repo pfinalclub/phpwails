@@ -1,0 +1,12 @@
+{
+  "name": "phpwails/framework",
+  "description": "PHP desktop application framework",
+  "type": "project",
+  "require": {"php": ">=8.2"},
+  "require-dev": {"phpunit/phpunit": "^11.5", "phpstan/phpstan": "^2.0", "nikic/php-parser": "^5.0"},
+  "autoload": {"psr-4": {"PhpWails\\Runtime\\": "packages/runtime/src/", "PhpWails\\Cli\\": "packages/cli/src/", "PhpWails\\Codegen\\": "packages/codegen/src/", "PhpWails\\Build\\": "packages/build/src/"}},
+  "autoload-dev": {"psr-4": {"PhpWails\\Tests\\": "tests/"}},
+  "bin": ["packages/cli/bin/phpwails"],
+  "minimum-stability": "stable",
+  "prefer-stable": true
+}

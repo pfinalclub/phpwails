@@ -1,0 +1,10 @@
+.claude/
+.specify/
+specs/
+my-app/
+vendor/
+build/
+node_modules/
+.DS_Store
+*.log
+*.tmp

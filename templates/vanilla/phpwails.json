@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "app": {"id": "com.example.hello", "name": "Hello", "version": "0.1.0"},
+  "window": {"title": "Hello PhpWails", "width": 1024, "height": 768, "centered": true},
+  "frontend": {"devCommand": ["npm", "run", "dev"], "distDir": "frontend/dist", "entryDocument": "frontend/index.html"},
+  "capabilities": []
+}
