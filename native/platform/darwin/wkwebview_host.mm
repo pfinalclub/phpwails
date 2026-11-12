@@ -103,7 +103,7 @@ private:
     auto* self = static_cast<MacWebViewHost*>(context);
     if (self && payload) {
       self->last_message_ = payload;
-      if (self->message_handler_) self->post_message(self->message_handler_(self->last_message_));
+      if (self->message_handler_) self->message_handler_(self->last_message_);
     }
   }
 

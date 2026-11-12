@@ -2,6 +2,10 @@ const result = document.querySelector('#result');
 const debug = document.querySelector('#debug');
 const report = message => { if (debug) debug.textContent += `${new Date().toISOString()} ${message}\n`; };
 report(`webkit=${typeof globalThis.webkit}, handler=${typeof globalThis.webkit?.messageHandlers?.phpwails}, App=${typeof globalThis.App}`);
+window.addEventListener('phpwails-runtime-stopped', event => {
+  report(`runtime stopped: ${event.detail?.message ?? 'unknown error'}`);
+  result.innerHTML = '<strong>PHP Runtime 已停止</strong><br><span>正在尝试重新启动，请稍后重试。</span>';
+});
 const navMessages = {
   '概览': '当前为应用概览，展示运行状态与 PHP 导出方法。',
   '接口': '接口页面：当前已注册 App.greet，可通过右侧按钮调用。',

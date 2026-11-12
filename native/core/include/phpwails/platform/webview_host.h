@@ -4,7 +4,7 @@
 #include <functional>
 #include "phpwails/window.h"
 namespace phpwails {
-using WebMessageHandler = std::function<std::string(const std::string&)>;
+using WebMessageHandler = std::function<void(const std::string&)>;
 class WebViewHost {
 public:
   virtual ~WebViewHost() = default;

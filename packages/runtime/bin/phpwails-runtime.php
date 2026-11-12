@@ -16,20 +16,51 @@ if (!class_exists('App')) { fwrite(STDERR, "App class not found\n"); exit(2); }
 $dispatcher = new PhpWails\Runtime\Dispatch\ExportDispatcher();
 $dispatcher->register(new App(), 'App');
 
+$write = static function (array $response): void {
+    fwrite(STDOUT, json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+    fflush(STDOUT);
+};
+
 while (($line = fgets(STDIN)) !== false) {
     $line = trim($line);
     if ($line === '') continue;
-    try {
-        $request = json_decode($line, true, 64, JSON_THROW_ON_ERROR);
-        if (is_string($request['params'] ?? null)) $request = json_decode($request['params'], true, 64, JSON_THROW_ON_ERROR);
-        $id = is_string($request['id'] ?? null) ? $request['id'] : null;
-        $method = is_string($request['method'] ?? null) ? $request['method'] : null;
-        if ($id === null || $method === null || !is_array($request['params'] ?? [])) throw new InvalidArgumentException('Invalid JSON-RPC request.');
-        $result = $dispatcher->invoke($method, $request['params']);
-        $response = isset($result['ok']) ? ['jsonrpc'=>'2.0','id'=>$id,'result'=>$result['result']] : ['jsonrpc'=>'2.0','id'=>$id,'error'=>['code'=>-32001,'message'=>$result['message'] ?? 'Invocation failed','data'=>$result]];
-    } catch (Throwable $error) {
-        $response = ['jsonrpc'=>'2.0','id'=>$id ?? null,'error'=>['code'=>-32600,'message'=>$error->getMessage()]];
+    if (strlen($line) > 1024 * 1024) {
+        $write(['jsonrpc' => '2.0', 'id' => null, 'error' => ['code' => -32600, 'message' => 'Request exceeds 1 MiB.']]);
+        continue;
     }
-    fwrite(STDOUT, json_encode($response, JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES) . PHP_EOL);
-    fflush(STDOUT);
+
+    $id = null;
+    $hasId = false;
+    try {
+        $request = json_decode($line, true, 64, JSON_THROW_ON_ERROR | JSON_BIGINT_AS_STRING);
+        if (!is_array($request) || ($request['jsonrpc'] ?? null) !== '2.0') {
+            throw new InvalidArgumentException('Invalid JSON-RPC request.');
+        }
+        $hasId = array_key_exists('id', $request);
+        $id = $request['id'] ?? null;
+        if ($hasId && !is_string($id) && !is_int($id)) {
+            throw new InvalidArgumentException('JSON-RPC id must be a string or integer.');
+        }
+        $method = $request['method'] ?? null;
+        if (!is_string($method) || $method === '') throw new InvalidArgumentException('JSON-RPC method must be a non-empty string.');
+        $params = $request['params'] ?? [];
+        if (!is_array($params)) throw new InvalidArgumentException('JSON-RPC params must be an object or array.');
+
+        $result = $dispatcher->invoke($method, $params);
+        if (!$hasId) continue; // Notification: execute without a response.
+        if (isset($result['ok']) && $result['ok'] === true) {
+            $write(['jsonrpc' => '2.0', 'id' => $id, 'result' => $result['result']]);
+        } else {
+            $write(['jsonrpc' => '2.0', 'id' => $id, 'error' => [
+                'code' => -32001,
+                'message' => $result['message'] ?? 'Invocation failed',
+                'data' => $result,
+            ]]);
+        }
+    } catch (Throwable $error) {
+        $write(['jsonrpc' => '2.0', 'id' => $hasId ? $id : null, 'error' => [
+            'code' => -32600,
+            'message' => $error->getMessage(),
+        ]]);
+    }
 }

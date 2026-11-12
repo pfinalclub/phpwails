@@ -14,11 +14,25 @@ globalThis.phpwails = {
       try { send({jsonrpc:'2.0', id, method, params}); }
       catch (error) { clearTimeout(timer); pending.delete(id); reject(error); }
     });
+  },
+  cancelAll(reason = 'PHP calls cancelled') {
+    const ids = [...pending.keys()];
+    if (ids.length) { try { send({jsonrpc:'2.0', method:'$/cancel', params:{ids}}); } catch (_) {} }
+    const error = new Error(reason);
+    for (const item of pending.values()) item.reject(error);
+    pending.clear();
   }
 };
 globalThis.addEventListener('phpwails', event => {
   try {
     const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (message?.event === 'runtime.stopped') {
+      const error = new Error(message.error?.message ?? 'PHP Runtime Worker stopped');
+      for (const item of pending.values()) item.reject(error);
+      pending.clear();
+      globalThis.dispatchEvent(new CustomEvent('phpwails-runtime-stopped', {detail: message.error}));
+      return;
+    }
     const item = pending.get(message?.id); if (!item) return;
     pending.delete(message.id);
     if (message.error) item.reject(message.error); else item.resolve(message.result);
