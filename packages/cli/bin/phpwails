@@ -100,6 +100,7 @@ if ($command === 'dev') {
     if (!is_file($entry)) { fwrite(STDERR, "Frontend entry not found at {$entry}.\n"); exit(2); }
     fwrite(STDOUT, "Starting native WebView launcher...\n");
     putenv('PHPWAILS_ROOT=' . $root);
+    putenv('PHPWAILS_PHP=' . PHP_BINARY);
     putenv('PHPWAILS_DEVTOOLS=1');
     passthru(escapeshellarg($launcher) . ' ' . escapeshellarg($entry) . ' ' . escapeshellarg($project), $status);
     exit($status);

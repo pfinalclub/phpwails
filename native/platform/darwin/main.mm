@@ -3,6 +3,7 @@
 #include "phpwails/platform/webview_host.h"
 #include <atomic>
 #include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
 #include <mutex>
@@ -54,7 +55,8 @@ public:
     output_ = [[NSPipe alloc] init];
     error_ = [[NSPipe alloc] init];
 
-    NSString* php = @"/usr/bin/php";
+    const char* php_environment = std::getenv("PHPWAILS_PHP");
+    NSString* php = [NSString stringWithUTF8String:(php_environment && *php_environment ? php_environment : "/usr/bin/php")];
     NSString* runtime = [NSString stringWithUTF8String:(root + "/packages/runtime/bin/phpwails-runtime.php").c_str()];
     NSString* projectPath = [NSString stringWithUTF8String:project.c_str()];
     task_.executableURL = [NSURL fileURLWithPath:php];
@@ -86,6 +88,18 @@ public:
       std::lock_guard<std::mutex> state_lock(state_mutex_);
       for (id value in ids) if ([value isKindOfClass:[NSString class]]) cancelled_ids_.insert([value UTF8String]);
       return true;
+    }
+    const bool tracks_response = object && object[@"id"] != nil;
+    if (!tracks_response) {
+      std::lock_guard<std::mutex> lock(write_mutex_);
+      @try {
+        NSString* line = [NSString stringWithFormat:@"%s\n", request.c_str()];
+        [input_.fileHandleForWriting writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+        return true;
+      } @catch (NSException* exception) {
+        std::cerr << "Unable to send PHP notification: " << exception.reason.UTF8String << "\n";
+        return false;
+      }
     }
     const unsigned previous = pending_count_.fetch_add(1);
     if (previous >= 64) {
