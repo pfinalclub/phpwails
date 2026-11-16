@@ -23,7 +23,7 @@ $emit = static function (string $name, array $data, int $exit = 0) use ($jsonOut
 };
 
 if ($command === '--version') { fwrite(STDOUT, "PhpWails 0.1.0-alpha\n"); exit(0); }
-if ($command === 'help') { fwrite(STDOUT, "PhpWails commands: doctor, init, dev, bindings, build\nOptions: --format=text|json --platform=darwin --arch=arm64|x86_64 --package-format=app\n"); exit(0); }
+if ($command === 'help') { fwrite(STDOUT, "PhpWails commands: doctor, init, dev, bindings, build\nOptions: --format=text|json --platform=darwin --arch=arm64|x86_64 --package-format=app --self-contained --offline\n"); exit(0); }
 
 if ($command === 'doctor') {
     $checks = [];
@@ -80,15 +80,21 @@ if ($command === 'build') {
     $platform = $value('--platform', 'darwin');
     $arch = $value('--arch');
     $format = $value('--package-format', 'app');
+    $selfContained = $has('--self-contained');
+    $offline = $has('--offline');
     require_once $root . '/packages/runtime/src/Config/ProjectConfig.php';
     require_once $root . '/packages/codegen/src/BindingCompiler.php';
+    require_once $root . '/packages/build/src/Archive/PharBuilder.php';
+    require_once $root . '/packages/build/src/Runtime/RuntimeCatalog.php';
+    require_once $root . '/packages/build/src/Runtime/RuntimeDownloader.php';
+    require_once $root . '/packages/build/src/Runtime/StaticPhpBuilder.php';
     require_once $root . '/packages/build/src/Manifest/BuildManifest.php';
     require_once $root . '/packages/build/src/Resources/ResourceCollector.php';
     require_once $root . '/packages/build/src/Platform/MacOSBundleBuilder.php';
     require_once $root . '/packages/build/src/Build/BuildPipeline.php';
     require_once $root . '/packages/build/src/Command/BuildCommand.php';
     try {
-        $result = (new \PhpWails\Build\Command\BuildCommand($root))->run($project, $platform, $arch, $format);
+        $result = (new \PhpWails\Build\Command\BuildCommand($root))->run($project, $platform, $arch, $format, $selfContained, $offline);
         $emit('build', $result);
     } catch (Throwable $error) {
         fwrite(STDERR, "Build failed: {$error->getMessage()}\n");

@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PhpWails\Build\Build;
 
+use PhpWails\Build\Archive\PharBuilder;
 use PhpWails\Build\Manifest\BuildManifest;
 use PhpWails\Build\Platform\MacOSBundleBuilder;
+use PhpWails\Build\Runtime\RuntimeCatalog;
+use PhpWails\Build\Runtime\RuntimeDownloader;
+use PhpWails\Build\Runtime\StaticPhpBuilder;
 use PhpWails\Build\Resources\ResourceCollector;
 use PhpWails\Codegen\BindingCompiler;
 use PhpWails\Runtime\Config\ProjectConfig;
@@ -15,7 +19,7 @@ final class BuildPipeline
 {
     public function __construct(private readonly string $frameworkRoot) {}
 
-    public function build(string $projectRoot, string $platform = 'darwin', ?string $arch = null, string $format = 'app'): array
+    public function build(string $projectRoot, string $platform = 'darwin', ?string $arch = null, string $format = 'app', bool $selfContained = false, bool $offline = false): array
     {
         $projectRoot = realpath($projectRoot) ?: $projectRoot;
         if ($platform !== 'darwin' || $format !== 'app') throw new RuntimeException('The first packaging target is macOS .app on the current host.');
@@ -53,6 +57,29 @@ final class BuildPipeline
             mkdir($resources, 0777, true);
             $collector->copyFile($launcher, $contents . '/MacOS/' . $appName);
             chmod($contents . '/MacOS/' . $appName, 0755);
+            $pharPath = $staging . '/app.phar';
+            (new PharBuilder($this->frameworkRoot))->build($projectRoot, $pharPath);
+            $collector->copyFile($pharPath, $resources . '/app.phar');
+            $staticRuntime = getenv('PHPWAILS_STATIC_PHP') ?: null;
+            $runtimeInfo = ['type' => 'host-php'];
+            if ($selfContained) {
+                $spcOverride = getenv('PHPWAILS_SPC') ?: null;
+                $catalog = RuntimeCatalog::fromFile($this->frameworkRoot . '/packages/build/resources/runtime-catalog.json');
+                $resolvedSpc = (new RuntimeDownloader($catalog))->resolve($platform, $arch, $spcOverride, $offline);
+                $spc = $resolvedSpc['path'];
+                $catalogInfo = $resolvedSpc;
+                unset($catalogInfo['path']);
+                $worker = $staging . '/phpwails-worker';
+                $runtimeConfig = $config->build['runtime'] ?? [];
+                $runtimeInfo = (new StaticPhpBuilder($this->frameworkRoot))->build($spc, $pharPath, $worker, $staging . '/runtime-work', $runtimeConfig['extensions'] ?? [], $runtimeConfig['phpVersion'] ?? null);
+                $runtimeInfo['tool'] = $catalogInfo;
+                $collector->copyFile($worker, $resources . '/runtime/phpwails-worker');
+                chmod($resources . '/runtime/phpwails-worker', 0755);
+            } elseif ($staticRuntime !== null) {
+                if (!is_file($staticRuntime) || !is_executable($staticRuntime)) throw new RuntimeException('PHPWAILS_STATIC_PHP must point to an executable static PHP runtime.');
+                $collector->copyFile($staticRuntime, $resources . '/runtime/php');
+                chmod($resources . '/runtime/php', 0755);
+            }
             $collector->copyTree($this->frameworkRoot . '/packages/runtime', $resources . '/packages/runtime');
             $collector->copyTree($projectRoot, $resources . '/project', ['build', '.git']);
             $frontendSource = dirname($entry);
@@ -68,12 +95,15 @@ final class BuildPipeline
                 'entry' => 'frontend/' . basename($entry),
                 'project' => 'project',
                 'runtimeRoot' => 'packages/runtime',
+                'runtime' => ['type' => $runtimeInfo['type'], 'path' => $selfContained ? 'runtime/phpwails-worker' : ($staticRuntime !== null ? 'runtime/php' : null)],
             ];
             file_put_contents($resources . '/launch.json', json_encode($launchConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n");
             (new MacOSBundleBuilder())->writeInfoPlist($contents . '/Info.plist', $config->app, $appName, is_string($icon) && $icon !== '');
             $resourceDigest = $collector->digest($resources);
             $artifactDigest = hash_file('sha256', $contents . '/MacOS/' . $appName);
             $buildManifest = BuildManifest::create(bin2hex(random_bytes(12)), ['platform' => $platform, 'arch' => $arch, 'format' => $format], $bundle, (int) filesize($contents . '/MacOS/' . $appName), $artifactDigest, $resourceDigest);
+            $buildManifest['archiveDigest'] = hash_file('sha256', $resources . '/app.phar');
+            $buildManifest['runtime'] = $runtimeInfo;
             file_put_contents($resources . '/build-manifest.json', json_encode($buildManifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n");
             $destination = $outputDir . '/' . $appName . '.app';
             if (is_dir($destination)) $this->removeTree($destination);

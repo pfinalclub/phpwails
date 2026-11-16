@@ -19,8 +19,17 @@ php packages/cli/bin/phpwails build my-app --platform=darwin --arch=$(uname -m) 
 open my-app/build/Hello.app
 ```
 
-The current Alpha bundle contains the project frontend, generated bindings, project PHP code and the framework runtime script. It uses the PHP executable selected by the launcher environment; a self-contained static PHP/PHAR distribution is a later build stage.
+The checked-in `packages/build/resources/runtime-catalog.json` pins the official macOS `spc` downloads by SHA-256 for x86_64 and arm64. These entries currently use the upstream v3 nightly channel because the upstream v3 documentation is available while a stable v3 release is not; the catalog must be refreshed deliberately when the channel changes. The generated `micro.sfx`/worker is built per target and its digest is recorded in the resulting build manifest.
 
+For a self-contained build, the CLI automatically downloads the pinned `spc` into `~/.cache/phpwails/tools/spc/<sha256>/spc`, verifies it, builds the micro worker, and assembles it into the `.app`:
+
+```bash
+php packages/cli/bin/phpwails build my-app \
+  --platform=darwin --arch=$(uname -m) \
+  --package-format=app --self-contained
+```
+
+Use `--offline` to require an existing verified cache. `PHPWAILS_SPC=/path/to/spc` remains an optional override and is also digest-checked.
 ## Project-owned metadata
 
 The application name, bundle identifier, version, window title, dimensions and future icon/menu declarations belong in the generated project's `phpwails.json`. The framework build pipeline maps them to the platform bundle. Framework source must not contain a specific application's name, menu or business action.
@@ -59,7 +68,7 @@ The framework will add, in separate stages:
 - project-provided icon conversion helpers (the current builder accepts `.icns`)
 - native `NSMenu` customization and controlled menu events
 - `NSStatusItem` and other platform tray adapters
-- PHAR plus static PHP runtime with no external PHP dependency
+- Runtime Catalog release artifacts and prebuilt micro-worker cache
 - DMG generation
 - codesign and notarization hooks
 - Windows WebView2 and Linux WebKitGTK packaging

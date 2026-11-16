@@ -51,6 +51,7 @@ build/Hello.app/
     ├── Info.plist
     ├── MacOS/Hello
     └── Resources/
+        ├── app.phar
         ├── frontend/
         ├── project/
         ├── packages/runtime/
@@ -58,4 +59,15 @@ build/Hello.app/
         └── build-manifest.json
 ```
 
-当前 Alpha 的 `.app` 包含 Demo 自带的 `assets/AppIcon.icns`，并使用开发机 PHP Runtime。静态 PHP、PHAR、原生菜单、状态栏、DMG、签名和公证属于后续框架能力，Demo 页面会明确标记这些状态，不会伪造已完成能力。
+默认 `.app` 使用主机 PHP；只有 `--self-contained` 并提供 `PHPWAILS_SPC` 后，才会将 micro Runtime 组合产物放入 `Resources/runtime/phpwails-worker`。
+
+如果已经准备好经过校验的 `spc`，可以尝试自包含构建：
+
+```bash
+PHPWAILS_SPC=/path/to/pinned/spc \
+php ../packages/cli/bin/phpwails build . \
+  --platform=darwin --arch=$(uname -m) \
+  --package-format=app --self-contained
+```
+
+该流程会调用 `spc build:php --build-micro` 和 `spc micro:combine`。

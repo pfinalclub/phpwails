@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "provider": "static-php-cli",
+  "toolChannel": "v3-nightly",
+  "observedAt": "2026-11-16",
+  "artifacts": {
+    "darwin-x86_64": {
+      "url": "https://dl.static-php.dev/v3/spc-bin/nightly/spc-macos-x86_64",
+      "sha256": "69cd85b4dd834db318c7ed4346e8136a7692ef062610075d32911465348f63ef",
+      "format": "mach-o-executable"
+    },
+    "darwin-arm64": {
+      "url": "https://dl.static-php.dev/v3/spc-bin/nightly/spc-macos-aarch64",
+      "sha256": "07ae0f82eca52beece2ec6475d5227876bd66c1d3ed28de4972ab1e8e792841f",
+      "format": "mach-o-executable"
+    }
+  },
+  "runtime": {
+    "phpVersion": "8.5",
+    "extensions": ["json", "phar", "openssl", "mbstring", "curl", "sqlite3", "pdo_sqlite"],
+    "status": "runtime-output-must-be-built-and-digested-per-target"
+  }
+}

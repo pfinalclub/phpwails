@@ -3,12 +3,13 @@
 
 declare(strict_types=1);
 
-$root = dirname(__DIR__, 3);
+$archive = Phar::running(false);
+$root = $archive !== '' ? 'phar://' . $archive : dirname(__DIR__, 3);
 require_once $root . '/packages/runtime/src/Attribute/Export.php';
 require_once $root . '/packages/runtime/src/Error/ErrorEnvelope.php';
 require_once $root . '/packages/runtime/src/Dispatch/ExportDispatcher.php';
 
-$project = $argv[1] ?? getcwd();
+$project = $argv[1] ?? ($archive !== '' ? $root : getcwd());
 $appFile = rtrim($project, DIRECTORY_SEPARATOR) . '/App.php';
 if (!is_file($appFile)) { fwrite(STDERR, "App.php not found in {$project}\n"); exit(2); }
 require_once $appFile;

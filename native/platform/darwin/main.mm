@@ -67,17 +67,23 @@ public:
     error_ = [[NSPipe alloc] init];
 
     const char* php_environment = std::getenv("PHPWAILS_PHP");
+    const char* bundled_worker = std::getenv("PHPWAILS_BUNDLED_WORKER");
     const char* default_php = access("/opt/homebrew/bin/php", X_OK) == 0 ? "/opt/homebrew/bin/php" :
       (access("/usr/local/bin/php", X_OK) == 0 ? "/usr/local/bin/php" : "/usr/bin/php");
-    NSString* php = [NSString stringWithUTF8String:(php_environment && *php_environment ? php_environment : default_php)];
+    NSString* php = [NSString stringWithUTF8String:(bundled_worker && *bundled_worker ? bundled_worker : (php_environment && *php_environment ? php_environment : default_php))];
     const char* runtime_environment = std::getenv("PHPWAILS_RUNTIME");
     const std::string runtime_path = runtime_environment && *runtime_environment
       ? runtime_environment
       : root + "/packages/runtime/bin/phpwails-runtime.php";
     NSString* runtime = [NSString stringWithUTF8String:runtime_path.c_str()];
     NSString* projectPath = [NSString stringWithUTF8String:project.c_str()];
+    const char* archive_environment = std::getenv("PHPWAILS_ARCHIVE");
+    const char* bundled_environment = std::getenv("PHPWAILS_BUNDLED_WORKER");
+    NSString* archive = archive_environment && *archive_environment
+      ? [NSString stringWithUTF8String:archive_environment]
+      : nil;
     task_.executableURL = [NSURL fileURLWithPath:php];
-    task_.arguments = @[runtime, projectPath];
+    task_.arguments = bundled_environment && *bundled_environment ? @[] : (archive ? @[archive] : @[runtime, projectPath]);
     task_.standardInput = input_;
     task_.standardOutput = output_;
     task_.standardError = [NSFileHandle fileHandleWithStandardError];
@@ -226,6 +232,12 @@ int main(int argc, const char* argv[]) {
       NSString* launch_path = [NSString stringWithUTF8String:(resources_root + "/launch.json").c_str()];
       NSString* launch_json = [NSString stringWithContentsOfFile:launch_path encoding:NSUTF8StringEncoding error:nil];
       if (launch_json) launch_config = parse_json_object([launch_json UTF8String]);
+      const std::string bundled_worker = resources_root + "/runtime/phpwails-worker";
+      if (access(bundled_worker.c_str(), X_OK) == 0) setenv("PHPWAILS_BUNDLED_WORKER", bundled_worker.c_str(), 1);
+      const std::string archive_path = resources_root + "/app.phar";
+      if (access(archive_path.c_str(), R_OK) == 0) setenv("PHPWAILS_ARCHIVE", archive_path.c_str(), 1);
+      const std::string bundled_php = resources_root + "/runtime/php";
+      if (access(bundled_php.c_str(), X_OK) == 0) setenv("PHPWAILS_PHP", bundled_php.c_str(), 1);
     }
     PersistentPhpRuntime runtime;
     int restart_attempts = 0;
