@@ -21,15 +21,28 @@ final class RuntimeDownloader
         $targetDir = rtrim($cache, DIRECTORY_SEPARATOR) . '/tools/spc/' . $entry['sha256'];
         $target = $targetDir . '/spc';
         if (is_file($target)) {
-            if (!is_executable($target)) chmod($target, 0755);
-            return ['path' => $target, 'source' => 'cache'] + $this->catalog->verifySpc($target, $platform, $arch);
+            try {
+                if (!is_executable($target)) chmod($target, 0755);
+                return ['path' => $target, 'source' => 'cache'] + $this->catalog->verifySpc($target, $platform, $arch);
+            } catch (RuntimeException $error) {
+                @unlink($target);
+                if ($offline) throw $error;
+            }
         }
         if ($offline) throw new RuntimeException("Pinned static-php-cli is not cached for {$platform}-{$arch}; offline mode forbids downloading it.");
         if (!is_dir($targetDir) && !mkdir($targetDir, 0777, true) && !is_dir($targetDir)) throw new RuntimeException("Unable to create runtime cache: {$targetDir}");
         $temporary = $targetDir . '/.spc-' . bin2hex(random_bytes(6));
         try {
-            $this->download($entry['url'], $temporary);
-            if (!hash_equals(strtolower((string) $entry['sha256']), strtolower(hash_file('sha256', $temporary)))) throw new RuntimeException('Downloaded static-php-cli failed SHA-256 verification.');
+            $expected = strtolower((string) $entry['sha256']);
+            $actual = '';
+            for ($attempt = 1; $attempt <= 3; $attempt++) {
+                $this->download($entry['url'], $temporary);
+                $actual = strtolower(hash_file('sha256', $temporary));
+                if (hash_equals($expected, $actual)) break;
+                @unlink($temporary);
+                if ($attempt < 3) usleep(250000);
+            }
+            if (!hash_equals($expected, $actual)) throw new RuntimeException("Downloaded static-php-cli failed SHA-256 verification for {$entry['key']}: expected {$expected}, got {$actual}");
             chmod($temporary, 0755);
             if (!rename($temporary, $target)) throw new RuntimeException("Unable to publish cached static-php-cli: {$target}");
             return ['path' => $target, 'source' => 'download'] + $this->catalog->verifySpc($target, $platform, $arch);
@@ -40,6 +53,17 @@ final class RuntimeDownloader
 
     private function download(string $url, string $target): void
     {
+        if (function_exists('curl_init')) {
+            $handle = curl_init($url);
+            $output = @fopen($target, 'wb');
+            if ($handle === false || $output === false) { if (is_resource($output)) fclose($output); throw new RuntimeException("Unable to download pinned static-php-cli: {$url}"); }
+            curl_setopt_array($handle, [CURLOPT_FILE => $output, CURLOPT_FOLLOWLOCATION => true, CURLOPT_FAILONERROR => true, CURLOPT_CONNECTTIMEOUT => 15, CURLOPT_TIMEOUT => 600, CURLOPT_USERAGENT => 'PhpWails Build Runtime']);
+            $ok = curl_exec($handle);
+            $error = curl_error($handle);
+            fclose($output);
+            if ($ok === false) { @unlink($target); throw new RuntimeException("Unable to download pinned static-php-cli: {$error}"); }
+            return;
+        }
         $input = @fopen($url, 'rb');
         if ($input === false) throw new RuntimeException("Unable to download pinned static-php-cli: {$url}");
         $output = @fopen($target, 'wb');

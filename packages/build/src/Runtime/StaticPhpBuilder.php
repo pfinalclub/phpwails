@@ -33,6 +33,10 @@ final class StaticPhpBuilder
         $stderr = stream_get_contents($pipes[2]);
         fclose($pipes[1]); fclose($pipes[2]);
         $exit = proc_close($process);
-        if ($exit !== 0) throw new RuntimeException(trim($stderr ?: $stdout) ?: 'static-php-cli failed.');
+        if ($exit !== 0) {
+            $message = trim($stderr ?: $stdout) ?: 'static-php-cli failed.';
+            if (str_contains($message, 'api.github.com') || str_contains($message, '403')) $message .= " Set GITHUB_TOKEN for GitHub API access or configure the static-php-cli mirror/proxy.";
+            throw new RuntimeException($message);
+        }
     }
 }
