@@ -23,7 +23,7 @@ $emit = static function (string $name, array $data, int $exit = 0) use ($jsonOut
 };
 
 if ($command === '--version') { fwrite(STDOUT, "PhpWails 0.1.0-alpha\n"); exit(0); }
-if ($command === 'help') { fwrite(STDOUT, "PhpWails commands: doctor, init, dev, bindings, build\nOptions: --format=text|json\n"); exit(0); }
+if ($command === 'help') { fwrite(STDOUT, "PhpWails commands: doctor, init, dev, bindings, build\nOptions: --format=text|json --platform=darwin --arch=arm64|x86_64 --package-format=app\n"); exit(0); }
 
 if ($command === 'doctor') {
     $checks = [];
@@ -71,6 +71,29 @@ if ($command === 'bindings') {
     if ($has('--check')) { $manifestPath = $output . '/manifest.json'; $current = is_file($manifestPath) ? json_decode((string) file_get_contents($manifestPath), true) : null; exit($current === $manifest ? 0 : 2); }
     $compiler->write($manifest, $output);
     $emit('bindings', ['outputDirectory'=>$output,'methodCount'=>count($manifest['methods']),'manifest'=>$manifest]);
+}
+
+if ($command === 'build') {
+    $project = isset($args[2]) && !str_starts_with($args[2], '--') ? $args[2] : getcwd();
+    $project = str_starts_with($project, DIRECTORY_SEPARATOR) ? $project : getcwd() . DIRECTORY_SEPARATOR . $project;
+    $project = realpath($project) ?: $project;
+    $platform = $value('--platform', 'darwin');
+    $arch = $value('--arch');
+    $format = $value('--package-format', 'app');
+    require_once $root . '/packages/runtime/src/Config/ProjectConfig.php';
+    require_once $root . '/packages/codegen/src/BindingCompiler.php';
+    require_once $root . '/packages/build/src/Manifest/BuildManifest.php';
+    require_once $root . '/packages/build/src/Resources/ResourceCollector.php';
+    require_once $root . '/packages/build/src/Platform/MacOSBundleBuilder.php';
+    require_once $root . '/packages/build/src/Build/BuildPipeline.php';
+    require_once $root . '/packages/build/src/Command/BuildCommand.php';
+    try {
+        $result = (new \PhpWails\Build\Command\BuildCommand($root))->run($project, $platform, $arch, $format);
+        $emit('build', $result);
+    } catch (Throwable $error) {
+        fwrite(STDERR, "Build failed: {$error->getMessage()}\n");
+        exit(3);
+    }
 }
 
 if ($command === 'dev') {

@@ -4,6 +4,8 @@ specs/
 my-app/
 vendor/
 build/
+!packages/build/
+!packages/build/**
 node_modules/
 .DS_Store
 *.log

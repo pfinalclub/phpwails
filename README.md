@@ -196,6 +196,19 @@ php packages/cli/bin/phpwails dev my-app
 php packages/cli/bin/phpwails dev my-app --no-window
 ```
 
+### 打包 macOS 应用
+
+PhpWails 是框架，`build` 会把用户项目打包成自己的 `.app`，不会生成固定的 PhpWails 应用：
+
+```bash
+cmake -S native -B /tmp/phpwails-native-build
+cmake --build /tmp/phpwails-native-build
+php packages/cli/bin/phpwails build my-app --platform=darwin --arch=$(uname -m) --package-format=app
+open my-app/build/Hello.app
+```
+
+详细说明见 [`docs/building.md`](docs/building.md)。当前 Alpha Demo 会真实展示 PHP Export、绑定、JSON-RPC、Runtime 和 `.app` Bundle；菜单、状态栏图标、静态 PHP、DMG、签名和公证仍在路线图中。
+
 ## 项目结构
 
 ```text
@@ -299,11 +312,11 @@ Hello, World!
 
 项目仍在早期设计和实现阶段。提交代码前建议先阅读：
 
-- `READM.md`：完整产品需求文档
+- `docs/PRD.md`：完整产品需求文档
 - `specs/002-phpwails-framework-spec/spec.md`：功能规格
 - `specs/002-phpwails-framework-spec/plan.md`：技术计划
 - `specs/002-phpwails-framework-spec/tasks.md`：实现任务
 
 ## 许可证
 
-许可证尚未最终确定。正式发布前会补充 `LICENSE`、贡献指南、行为准则和安全策略。
+项目采用 [MIT License](LICENSE)。当前仍处于 Alpha / 原型阶段；macOS `.app` 打包正在完善，静态 PHP、DMG、签名、公证、Windows 和 Linux 发布产物尚未完成。

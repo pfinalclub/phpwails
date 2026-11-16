@@ -10,6 +10,7 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <unistd.h>
 
 static std::string json_error(const char* message) {
   return std::string(R"({"jsonrpc":"2.0","id":null,"error":{"code":-32000,"message":")") + message + R"("}})";
@@ -27,6 +28,16 @@ static NSDictionary* parse_json_object(const std::string& json) {
 static std::string json_string_value(NSDictionary* object, NSString* key) {
   id value = object[key];
   return [value isKindOfClass:[NSString class]] ? std::string([value UTF8String]) : std::string();
+}
+
+static int json_int_value(NSDictionary* object, NSString* key, int fallback) {
+  id value = object[key];
+  return [value respondsToSelector:@selector(intValue)] ? [value intValue] : fallback;
+}
+
+static bool json_bool_value(NSDictionary* object, NSString* key, bool fallback) {
+  id value = object[key];
+  return [value respondsToSelector:@selector(boolValue)] ? [value boolValue] : fallback;
 }
 
 /** A single long-lived PHP worker connected through stdin/stdout. */
@@ -56,8 +67,14 @@ public:
     error_ = [[NSPipe alloc] init];
 
     const char* php_environment = std::getenv("PHPWAILS_PHP");
-    NSString* php = [NSString stringWithUTF8String:(php_environment && *php_environment ? php_environment : "/usr/bin/php")];
-    NSString* runtime = [NSString stringWithUTF8String:(root + "/packages/runtime/bin/phpwails-runtime.php").c_str()];
+    const char* default_php = access("/opt/homebrew/bin/php", X_OK) == 0 ? "/opt/homebrew/bin/php" :
+      (access("/usr/local/bin/php", X_OK) == 0 ? "/usr/local/bin/php" : "/usr/bin/php");
+    NSString* php = [NSString stringWithUTF8String:(php_environment && *php_environment ? php_environment : default_php)];
+    const char* runtime_environment = std::getenv("PHPWAILS_RUNTIME");
+    const std::string runtime_path = runtime_environment && *runtime_environment
+      ? runtime_environment
+      : root + "/packages/runtime/bin/phpwails-runtime.php";
+    NSString* runtime = [NSString stringWithUTF8String:runtime_path.c_str()];
     NSString* projectPath = [NSString stringWithUTF8String:project.c_str()];
     task_.executableURL = [NSURL fileURLWithPath:php];
     task_.arguments = @[runtime, projectPath];
@@ -195,8 +212,21 @@ int main(int argc, const char* argv[]) {
   @autoreleasepool {
     auto host = phpwails::create_platform_webview();
     if (!host) { std::cerr << "Unable to create platform WebView host\n"; return 3; }
-    const char* root = std::getenv("PHPWAILS_ROOT");
-    const std::string project = argc > 2 ? argv[2] : "";
+    const std::string executable = argc > 0 ? argv[0] : "";
+    const std::string marker = "/Contents/MacOS/";
+    const size_t marker_position = executable.rfind(marker);
+    const std::string bundle_root = marker_position == std::string::npos ? "" : executable.substr(0, marker_position);
+    const std::string resources_root = bundle_root.empty() ? "" : bundle_root + "/Contents/Resources";
+    const char* root_environment = std::getenv("PHPWAILS_ROOT");
+    const std::string root_path = root_environment && *root_environment ? root_environment : resources_root;
+    const std::string project = argc > 2 ? argv[2] : resources_root + "/project";
+    const std::string entry = argc > 1 ? argv[1] : resources_root + "/frontend/index.html";
+    NSDictionary* launch_config = nil;
+    if (!resources_root.empty()) {
+      NSString* launch_path = [NSString stringWithUTF8String:(resources_root + "/launch.json").c_str()];
+      NSString* launch_json = [NSString stringWithContentsOfFile:launch_path encoding:NSUTF8StringEncoding error:nil];
+      if (launch_json) launch_config = parse_json_object([launch_json UTF8String]);
+    }
     PersistentPhpRuntime runtime;
     int restart_attempts = 0;
     runtime.set_failure_handler([&host, &runtime, &restart_attempts](const std::string& message) {
@@ -218,15 +248,19 @@ int main(int argc, const char* argv[]) {
         }
       });
     });
-    runtime.start(root ? root : "", project, [&host](const std::string& response) {
+    runtime.start(root_path, project, [&host](const std::string& response) {
       if (host) host->post_message(response);
     });
     host->set_message_handler([&runtime, &host](const std::string& request) {
       if (!runtime.send(request) && host) host->post_message(json_error("PHP Runtime is not running or request queue is full"));
     });
-    phpwails::WindowOptions options; options.title = "PhpWails";
+    phpwails::WindowOptions options;
+    options.title = launch_config ? json_string_value(launch_config, @"title") : "PhpWails";
+    options.width = launch_config ? json_int_value(launch_config, @"width", 1024) : 1024;
+    options.height = launch_config ? json_int_value(launch_config, @"height", 768) : 768;
+    options.centered = launch_config ? json_bool_value(launch_config, @"centered", true) : true;
     if (!host->create(options)) { runtime.stop(); std::cerr << "Unable to create application window\n"; return 3; }
-    if (argc > 1) host->navigate("file://" + std::string(argv[1]));
+    if (!entry.empty()) host->navigate("file://" + entry);
     [NSApp run];
     host->close();
     runtime.stop();

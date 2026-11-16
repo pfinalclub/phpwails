@@ -1,1 +1,47 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","required":["schemaVersion","app","window","frontend"],"properties":{"schemaVersion":{"type":"integer","minimum":1},"app":{"type":"object","required":["id","name","version"]},"window":{"type":"object","required":["title","width","height"]},"frontend":{"type":"object","required":["distDir","entryDocument"]},"capabilities":{"type":"array","items":{"type":"string"}}},"additionalProperties":false}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schemaVersion", "app", "window", "frontend"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"type": "integer", "minimum": 1},
+    "app": {
+      "type": "object", "required": ["id", "name", "version"], "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[A-Za-z0-9.-]+$"},
+        "name": {"type": "string", "minLength": 1},
+        "displayName": {"type": "string"},
+        "version": {"type": "string", "minLength": 1},
+        "description": {"type": "string"},
+        "icon": {"type": "string"}
+      }
+    },
+    "window": {
+      "type": "object", "required": ["title", "width", "height"], "additionalProperties": false,
+      "properties": {
+        "title": {"type": "string"}, "width": {"type": "integer", "minimum": 1}, "height": {"type": "integer", "minimum": 1},
+        "centered": {"type": "boolean"}, "resizable": {"type": "boolean"}, "fullscreen": {"type": "boolean"}, "alwaysOnTop": {"type": "boolean"}
+      }
+    },
+    "frontend": {
+      "type": "object", "required": ["distDir", "entryDocument"], "additionalProperties": false,
+      "properties": {
+        "devCommand": {"type": "array", "items": {"type": "string"}},
+        "buildCommand": {"type": "array", "items": {"type": "string"}},
+        "distDir": {"type": "string"}, "entryDocument": {"type": "string"}
+      }
+    },
+    "build": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "outputDir": {"type": "string"},
+        "targets": {"type": "array", "items": {"type": "object"}},
+        "macos": {"type": "object"},
+        "runtimeChannel": {"type": "string"}
+      }
+    },
+    "menu": {"type": "object"},
+    "statusItem": {"type": "object"},
+    "capabilities": {"type": "array", "items": {"type": "string"}}
+  }
+}

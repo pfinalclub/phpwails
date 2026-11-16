@@ -295,11 +295,11 @@ These are product goals. They must be measured on real platforms and clean devic
 
 The project is still in an early design and implementation stage. Before contributing, read:
 
-- `READM.md`: complete product requirements
+- `docs/PRD.md`: complete product requirements
 - `specs/002-phpwails-framework-spec/spec.md`: feature specification
 - `specs/002-phpwails-framework-spec/plan.md`: technical plan
 - `specs/002-phpwails-framework-spec/tasks.md`: implementation tasks
 
 ## License
 
-The license has not been finalized yet. `LICENSE`, contribution guidelines, code of conduct, and security policy will be added before the first formal release.
+The project is released under the [MIT License](LICENSE). It is still in the Alpha / prototype stage; macOS `.app` packaging is being established, while static PHP, DMG, signing, notarization, Windows, and Linux release artifacts are not complete.

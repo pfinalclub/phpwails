@@ -1,0 +1,5 @@
+{
+  "name": "phpwails/build",
+  "type": "library",
+  "autoload": {"psr-4": {"PhpWails\\Build\\": "src/"}}
+}

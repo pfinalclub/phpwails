@@ -27,6 +27,7 @@ public:
   bool create(const WindowOptions& options) override {
     [NSApplication sharedApplication];
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    install_default_menu(options.title);
     NSRect frame = NSMakeRect(0, 0, options.width, options.height);
     NSUInteger style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable |
                        NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable;
@@ -99,6 +100,41 @@ public:
   }
 
 private:
+  void install_default_menu(const std::string& title) {
+    NSString* appTitle = [NSString stringWithUTF8String:title.c_str()];
+    NSMenu* menu = [[NSMenu alloc] initWithTitle:@"Main Menu"];
+    NSMenuItem* appItem = [[NSMenuItem alloc] initWithTitle:appTitle action:nil keyEquivalent:@""];
+    NSMenu* appMenu = [[NSMenu alloc] initWithTitle:appTitle];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"About %@", appTitle] action:@selector(orderFrontStandardAboutPanel:) keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Hide %@", appTitle] action:@selector(hide:) keyEquivalent:@"h"];
+    [appMenu addItemWithTitle:@"Hide Others" action:@selector(hideOtherApplications:) keyEquivalent:@"h"];
+    [appMenu addItemWithTitle:@"Show All" action:@selector(unhideAllApplications:) keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItemWithTitle:[NSString stringWithFormat:@"Quit %@", appTitle] action:@selector(terminate:) keyEquivalent:@"q"];
+    [menu addItem:appItem];
+    [menu setSubmenu:appMenu forItem:appItem];
+
+    NSMenuItem* editItem = [[NSMenuItem alloc] initWithTitle:@"Edit" action:nil keyEquivalent:@""];
+    NSMenu* editMenu = [[NSMenu alloc] initWithTitle:@"Edit"];
+    [editMenu addItemWithTitle:@"Undo" action:@selector(undo:) keyEquivalent:@"z"];
+    [editMenu addItemWithTitle:@"Redo" action:@selector(redo:) keyEquivalent:@"Z"];
+    [editMenu addItem:[NSMenuItem separatorItem]];
+    [editMenu addItemWithTitle:@"Cut" action:@selector(cut:) keyEquivalent:@"x"];
+    [editMenu addItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"];
+    [editMenu addItemWithTitle:@"Paste" action:@selector(paste:) keyEquivalent:@"v"];
+    [menu addItem:editItem];
+    [menu setSubmenu:editMenu forItem:editItem];
+
+    NSMenuItem* windowItem = [[NSMenuItem alloc] initWithTitle:@"Window" action:nil keyEquivalent:@""];
+    NSMenu* windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+    [windowMenu addItemWithTitle:@"Minimize" action:@selector(performMiniaturize:) keyEquivalent:@"m"];
+    [windowMenu addItemWithTitle:@"Zoom" action:@selector(performZoom:) keyEquivalent:@""];
+    [menu addItem:windowItem];
+    [menu setSubmenu:windowMenu forItem:windowItem];
+    [NSApp setMainMenu:menu];
+  }
+
   static void receive_message(const char* payload, void* context) {
     auto* self = static_cast<MacWebViewHost*>(context);
     if (self && payload) {

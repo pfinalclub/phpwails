@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "app": {"id": "com.example.hello", "name": "Hello", "version": "0.1.0", "description": "PhpWails framework showcase", "icon": "assets/AppIcon.icns"},
+  "window": {"title": "Hello · PhpWails Demo", "width": 1180, "height": 820, "centered": true, "resizable": true},
+  "frontend": {"devCommand": ["npm", "run", "dev"], "buildCommand": ["npm", "run", "build"], "distDir": "frontend/dist", "entryDocument": "frontend/index.html"},
+  "build": {"outputDir": "build", "targets": [{"platform": "darwin", "arch": "arm64", "formats": ["app"]}]},
+  "menu": {"enabled": false, "items": [], "note": "Menu model is reserved for the native capability roadmap."},
+  "statusItem": {"enabled": false, "note": "Status item is reserved for the native capability roadmap."},
+  "capabilities": []
+}
